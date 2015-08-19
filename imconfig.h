@@ -12,6 +12,19 @@
 //---- Define attributes of all API symbols declarations, e.g. for DLL under Windows.
 //#define IMGUI_API __declspec( dllexport )
 //#define IMGUI_API __declspec( dllimport )
+#if defined (_WIN32)
+#if defined (IMGUI_IMPL)
+#define IMGUI_API __declspec(dllexport)
+#else
+#define IMGUI_API __declspec(dllimport)
+#endif
+#else
+#if defined (IMGUI_IMPL)
+#define IMGUI_API __attribute__((visibility("default")))
+#else
+#define IMGUI_API
+#endif
+#endif
 
 //---- Include imgui_user.inl at the end of imgui.cpp so you can include code that extends ImGui using its private data/functions.
 //#define IMGUI_INCLUDE_IMGUI_USER_INL
