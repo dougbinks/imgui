@@ -1,4 +1,7 @@
 // ImGui GLFW binding with OpenGL3 + shaders
+// You can copy and use unmodified imgui_impl_* files in your project. 
+// If you use this binding you'll need to call 4 functions: ImGui_ImplXXXX_Init(), ImGui_ImplXXXX_NewFrame(), ImGui::Render() and ImGui_ImplXXXX_Shutdown().
+// See main.cpp for an example of using this.
 // https://github.com/ocornut/imgui
 
 #include <imgui.h>
@@ -28,12 +31,24 @@ static unsigned int g_VboHandle = 0, g_VaoHandle = 0, g_ElementsHandle = 0;
 // This is the main rendering function that you have to implement and provide to ImGui (via setting up 'RenderDrawListsFn' in the ImGuiIO structure)
 // If text or lines are blurry when integrating ImGui in your engine:
 // - in your Render function, try translating your projection matrix by (0.5f,0.5f) or (0.375f,0.375f)
-static void ImGui_ImplGlfwGL3_RenderDrawLists(ImDrawData* draw_data)
+void ImGui_ImplGlfwGL3_RenderDrawLists(ImDrawData* draw_data)
 {
+    // Backup GL state
+    GLint last_program; glGetIntegerv(GL_CURRENT_PROGRAM, &last_program);
+    GLint last_texture; glGetIntegerv(GL_TEXTURE_BINDING_2D, &last_texture);
+    GLint last_array_buffer; glGetIntegerv(GL_ARRAY_BUFFER_BINDING, &last_array_buffer);
+    GLint last_element_array_buffer; glGetIntegerv(GL_ELEMENT_ARRAY_BUFFER_BINDING, &last_element_array_buffer);
+    GLint last_vertex_array; glGetIntegerv(GL_VERTEX_ARRAY_BINDING, &last_vertex_array);
+	GLint last_blend_src; glGetIntegerv(GL_BLEND_SRC, &last_blend_src);
+	GLint last_blend_dst; glGetIntegerv(GL_BLEND_DST, &last_blend_dst);
+	GLint last_blend_equation_rgb; glGetIntegerv(GL_BLEND_EQUATION_RGB, &last_blend_equation_rgb);
+	GLint last_blend_equation_alpha; glGetIntegerv(GL_BLEND_EQUATION_ALPHA, &last_blend_equation_alpha);
+	GLboolean last_enable_blend = glIsEnabled(GL_BLEND);
+	GLboolean last_enable_cull_face = glIsEnabled(GL_CULL_FACE);
+	GLboolean last_enable_depth_test = glIsEnabled(GL_DEPTH_TEST);
+	GLboolean last_enable_scissor_test = glIsEnabled(GL_SCISSOR_TEST);
+
     // Setup render state: alpha-blending enabled, no face culling, no depth testing, scissor enabled
-    GLint last_program, last_texture;
-    glGetIntegerv(GL_CURRENT_PROGRAM, &last_program);
-    glGetIntegerv(GL_TEXTURE_BINDING_2D, &last_texture);
     glEnable(GL_BLEND);
     glBlendEquation(GL_FUNC_ADD);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
@@ -42,15 +57,18 @@ static void ImGui_ImplGlfwGL3_RenderDrawLists(ImDrawData* draw_data)
     glEnable(GL_SCISSOR_TEST);
     glActiveTexture(GL_TEXTURE0);
 
+    // Handle cases of screen coordinates != from framebuffer coordinates (e.g. retina displays)
+    ImGuiIO& io = ImGui::GetIO();
+    float fb_height = io.DisplaySize.y * io.DisplayFramebufferScale.y;
+    draw_data->ScaleClipRects(io.DisplayFramebufferScale);
+
     // Setup orthographic projection matrix
-    const float width = ImGui::GetIO().DisplaySize.x;
-    const float height = ImGui::GetIO().DisplaySize.y;
     const float ortho_projection[4][4] =
     {
-        { 2.0f/width,	0.0f,			0.0f,		0.0f },
-        { 0.0f,			2.0f/-height,	0.0f,		0.0f },
-        { 0.0f,			0.0f,			-1.0f,		0.0f },
-        { -1.0f,		1.0f,			0.0f,		1.0f },
+        { 2.0f/io.DisplaySize.x, 0.0f,                   0.0f, 0.0f },
+        { 0.0f,                  2.0f/-io.DisplaySize.y, 0.0f, 0.0f },
+        { 0.0f,                  0.0f,                  -1.0f, 0.0f },
+        {-1.0f,                  1.0f,                   0.0f, 1.0f },
     };
     glUseProgram(g_ShaderHandle);
     glUniform1i(g_AttribLocationTex, 0);
@@ -77,20 +95,25 @@ static void ImGui_ImplGlfwGL3_RenderDrawLists(ImDrawData* draw_data)
             else
             {
                 glBindTexture(GL_TEXTURE_2D, (GLuint)(intptr_t)pcmd->TextureId);
-                glScissor((int)pcmd->ClipRect.x, (int)(height - pcmd->ClipRect.w), (int)(pcmd->ClipRect.z - pcmd->ClipRect.x), (int)(pcmd->ClipRect.w - pcmd->ClipRect.y));
+                glScissor((int)pcmd->ClipRect.x, (int)(fb_height - pcmd->ClipRect.w), (int)(pcmd->ClipRect.z - pcmd->ClipRect.x), (int)(pcmd->ClipRect.w - pcmd->ClipRect.y));
                 glDrawElements(GL_TRIANGLES, (GLsizei)pcmd->ElemCount, GL_UNSIGNED_SHORT, idx_buffer_offset);
             }
             idx_buffer_offset += pcmd->ElemCount;
         }
     }
 
-    // Restore modified state
-    glBindVertexArray(0);
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+    // Restore modified GL state
     glUseProgram(last_program);
-    glDisable(GL_SCISSOR_TEST);
     glBindTexture(GL_TEXTURE_2D, last_texture);
+    glBindBuffer(GL_ARRAY_BUFFER, last_array_buffer);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, last_element_array_buffer);
+    glBindVertexArray(last_vertex_array);
+	glBlendEquationSeparate(last_blend_equation_rgb, last_blend_equation_alpha);
+	glBlendFunc(last_blend_src, last_blend_dst);
+	if (last_enable_blend) glEnable(GL_BLEND); else glDisable(GL_BLEND);
+	if (last_enable_cull_face) glEnable(GL_CULL_FACE); else glDisable(GL_CULL_FACE);
+	if (last_enable_depth_test) glEnable(GL_DEPTH_TEST); else glDisable(GL_DEPTH_TEST);
+	if (last_enable_scissor_test) glEnable(GL_SCISSOR_TEST); else glDisable(GL_SCISSOR_TEST);
 }
 
 static const char* ImGui_ImplGlfwGL3_GetClipboardText()
@@ -139,10 +162,12 @@ void ImGui_ImplGlfwGL3_CreateFontsTexture()
 {
     ImGuiIO& io = ImGui::GetIO();
 
+    // Build texture atlas
     unsigned char* pixels;
     int width, height;
     io.Fonts->GetTexDataAsRGBA32(&pixels, &width, &height);   // Load as RGBA 32-bits for OpenGL3 demo because it is more likely to be compatible with user's existing shader.
 
+	// Create OpenGL texture
     glGenTextures(1, &g_FontTexture);
     glBindTexture(GL_TEXTURE_2D, g_FontTexture);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
@@ -159,6 +184,12 @@ void ImGui_ImplGlfwGL3_CreateFontsTexture()
 
 bool ImGui_ImplGlfwGL3_CreateDeviceObjects()
 {
+    // Backup GL state
+    GLint last_texture, last_array_buffer, last_vertex_array;
+    glGetIntegerv(GL_TEXTURE_BINDING_2D, &last_texture);
+    glGetIntegerv(GL_ARRAY_BUFFER_BINDING, &last_array_buffer);
+    glGetIntegerv(GL_VERTEX_ARRAY_BINDING, &last_vertex_array);
+
     const GLchar *vertex_shader =
         "#version 330\n"
         "uniform mat4 ProjMtx;\n"
@@ -217,10 +248,13 @@ bool ImGui_ImplGlfwGL3_CreateDeviceObjects()
     glVertexAttribPointer(g_AttribLocationUV, 2, GL_FLOAT, GL_FALSE, sizeof(ImDrawVert), (GLvoid*)OFFSETOF(ImDrawVert, uv));
     glVertexAttribPointer(g_AttribLocationColor, 4, GL_UNSIGNED_BYTE, GL_TRUE, sizeof(ImDrawVert), (GLvoid*)OFFSETOF(ImDrawVert, col));
 #undef OFFSETOF
-    glBindVertexArray(0);
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
 
     ImGui_ImplGlfwGL3_CreateFontsTexture();
+
+    // Restore modified GL state
+    glBindTexture(GL_TEXTURE_2D, last_texture);
+    glBindBuffer(GL_ARRAY_BUFFER, last_array_buffer);
+    glBindVertexArray(last_vertex_array);
 
     return true;
 }
@@ -230,7 +264,7 @@ bool    ImGui_ImplGlfwGL3_Init(GLFWwindow* window, bool install_callbacks)
     g_Window = window;
 
     ImGuiIO& io = ImGui::GetIO();
-    io.KeyMap[ImGuiKey_Tab] = GLFW_KEY_TAB;                 // Keyboard mapping. ImGui will use those indices to peek into the io.KeyDown[] array.
+    io.KeyMap[ImGuiKey_Tab] = GLFW_KEY_TAB;                         // Keyboard mapping. ImGui will use those indices to peek into the io.KeyDown[] array.
     io.KeyMap[ImGuiKey_LeftArrow] = GLFW_KEY_LEFT;
     io.KeyMap[ImGuiKey_RightArrow] = GLFW_KEY_RIGHT;
     io.KeyMap[ImGuiKey_UpArrow] = GLFW_KEY_UP;
@@ -250,7 +284,7 @@ bool    ImGui_ImplGlfwGL3_Init(GLFWwindow* window, bool install_callbacks)
     io.KeyMap[ImGuiKey_Y] = GLFW_KEY_Y;
     io.KeyMap[ImGuiKey_Z] = GLFW_KEY_Z;
 
-    io.RenderDrawListsFn = ImGui_ImplGlfwGL3_RenderDrawLists;
+    io.RenderDrawListsFn = ImGui_ImplGlfwGL3_RenderDrawLists;       // Alternatively you can set this to NULL and call ImGui::GetDrawData() after ImGui::Render() to get the same ImDrawData pointer.
     io.SetClipboardTextFn = ImGui_ImplGlfwGL3_SetClipboardText;
     io.GetClipboardTextFn = ImGui_ImplGlfwGL3_GetClipboardText;
 #ifdef _WIN32
@@ -307,7 +341,8 @@ void ImGui_ImplGlfwGL3_NewFrame()
     int display_w, display_h;
     glfwGetWindowSize(g_Window, &w, &h);
     glfwGetFramebufferSize(g_Window, &display_w, &display_h);
-    io.DisplaySize = ImVec2((float)display_w, (float)display_h);
+    io.DisplaySize = ImVec2((float)w, (float)h);
+    io.DisplayFramebufferScale = ImVec2((float)display_w / w, (float)display_h / h);
 
     // Setup time step
     double current_time =  glfwGetTime();
@@ -320,9 +355,7 @@ void ImGui_ImplGlfwGL3_NewFrame()
     {
     	double mouse_x, mouse_y;
     	glfwGetCursorPos(g_Window, &mouse_x, &mouse_y);
-    	mouse_x *= (float)display_w / w;                        // Convert mouse coordinates to pixels
-    	mouse_y *= (float)display_h / h;
-    	io.MousePos = ImVec2((float)mouse_x, (float)mouse_y);   // Mouse position, in pixels (set to -1,-1 if no mouse / on another screen, etc.)
+    	io.MousePos = ImVec2((float)mouse_x, (float)mouse_y);   // Mouse position in screen coordinates (set to -1,-1 if no mouse / on another screen, etc.)
     }
     else
     {

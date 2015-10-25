@@ -10,6 +10,7 @@
 
 #CXX = g++
 
+EXE = opengl_example
 OBJS = main.o imgui_impl_glfw.o
 OBJS += ../../imgui.o ../../imgui_demo.o ../../imgui_draw.o
 
@@ -37,15 +38,24 @@ ifeq ($(UNAME_S), Darwin) #APPLE
 	CFLAGS = $(CXXFLAGS)
 endif
 
+ifeq ($(UNAME_S), MINGW64_NT-6.3)
+   ECHO_MESSAGE = "Windows"
+   LIBS = -lglfw3 -lgdi32 -lopengl32 -limm32
+
+   CXXFLAGS = -I../../ -I../libs/gl3w `pkg-config --cflags glfw3`
+   CXXFLAGS += -Wall -Wformat
+   CFLAGS = $(CXXFLAGS)
+endif
+
 .cpp.o:
 	$(CXX) $(CXXFLAGS) -c -o $@ $<
 
-all:imgui_example
+all: $(EXE)
 	@echo Build complete for $(ECHO_MESSAGE)
 
-imgui_example:$(OBJS)
-	$(CXX) -o imgui_example $(OBJS) $(CXXFLAGS) $(LIBS)
+$(EXE): $(OBJS)
+	$(CXX) -o $(EXE) $(OBJS) $(CXXFLAGS) $(LIBS)
 
 clean:
-	rm $(OBJS)
+	rm $(EXE) $(OBJS)
 

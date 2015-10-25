@@ -1,4 +1,7 @@
 // ImGui Win32 + DirectX9 binding
+// You can copy and use unmodified imgui_impl_* files in your project. 
+// If you use this binding you'll need to call 4 functions: ImGui_ImplXXXX_Init(), ImGui_ImplXXXX_NewFrame(), ImGui::Render() and ImGui_ImplXXXX_Shutdown().
+// See main.cpp for an example of using this.
 // https://github.com/ocornut/imgui
 
 #include <imgui.h>
@@ -30,7 +33,7 @@ struct CUSTOMVERTEX
 // This is the main rendering function that you have to implement and provide to ImGui (via setting up 'RenderDrawListsFn' in the ImGuiIO structure)
 // If text or lines are blurry when integrating ImGui in your engine:
 // - in your Render function, try translating your projection matrix by (0.5f,0.5f) or (0.375f,0.375f)
-static void ImGui_ImplDX9_RenderDrawLists(ImDrawData* draw_data)
+void ImGui_ImplDX9_RenderDrawLists(ImDrawData* draw_data)
 {
     // Create and grow buffers if needed
     if (!g_pVB || g_VertexBufferSize < draw_data->TotalVtxCount)
@@ -133,7 +136,7 @@ static void ImGui_ImplDX9_RenderDrawLists(ImDrawData* draw_data)
     }
 }
 
-LRESULT ImGui_ImplDX9_WndProcHandler(HWND, UINT msg, WPARAM wParam, LPARAM lParam)
+IMGUI_API LRESULT ImGui_ImplDX9_WndProcHandler(HWND, UINT msg, WPARAM wParam, LPARAM lParam)
 {
     ImGuiIO& io = ImGui::GetIO();
     switch (msg)
@@ -149,6 +152,12 @@ LRESULT ImGui_ImplDX9_WndProcHandler(HWND, UINT msg, WPARAM wParam, LPARAM lPara
         return true;
     case WM_RBUTTONUP:
         io.MouseDown[1] = false; 
+        return true;
+    case WM_MBUTTONDOWN:
+        io.MouseDown[2] = true; 
+        return true;
+    case WM_MBUTTONUP:
+        io.MouseDown[2] = false; 
         return true;
     case WM_MOUSEWHEEL:
         io.MouseWheel += GET_WHEEL_DELTA_WPARAM(wParam) > 0 ? +1.0f : -1.0f;
@@ -185,7 +194,7 @@ bool    ImGui_ImplDX9_Init(void* hwnd, IDirect3DDevice9* device)
         return false;
 
     ImGuiIO& io = ImGui::GetIO();
-    io.KeyMap[ImGuiKey_Tab] = VK_TAB;                              // Keyboard mapping. ImGui will use those indices to peek into the io.KeyDown[] array that we will update during the application lifetime.
+    io.KeyMap[ImGuiKey_Tab] = VK_TAB;                       // Keyboard mapping. ImGui will use those indices to peek into the io.KeyDown[] array that we will update during the application lifetime.
     io.KeyMap[ImGuiKey_LeftArrow] = VK_LEFT;
     io.KeyMap[ImGuiKey_RightArrow] = VK_RIGHT;
     io.KeyMap[ImGuiKey_UpArrow] = VK_UP;
@@ -205,7 +214,7 @@ bool    ImGui_ImplDX9_Init(void* hwnd, IDirect3DDevice9* device)
     io.KeyMap[ImGuiKey_Y] = 'Y';
     io.KeyMap[ImGuiKey_Z] = 'Z';
 
-    io.RenderDrawListsFn = ImGui_ImplDX9_RenderDrawLists;
+    io.RenderDrawListsFn = ImGui_ImplDX9_RenderDrawLists;   // Alternatively you can set this to NULL and call ImGui::GetDrawData() after ImGui::Render() to get the same ImDrawData pointer.
     io.ImeWindowHandle = g_hWnd;
 
     return true;
@@ -276,6 +285,7 @@ void ImGui_ImplDX9_InvalidateDeviceObjects()
         tex->Release();
         ImGui::GetIO().Fonts->TexID = 0;
     }
+    g_FontTexture = NULL;
 }
 
 void ImGui_ImplDX9_NewFrame()

@@ -1,4 +1,7 @@
 // ImGui GLFW binding with OpenGL
+// You can copy and use unmodified imgui_impl_* files in your project. 
+// If you use this binding you'll need to call 4 functions: ImGui_ImplXXXX_Init(), ImGui_ImplXXXX_NewFrame(), ImGui::Render() and ImGui_ImplXXXX_Shutdown().
+// See main.cpp for an example of using this.
 // https://github.com/ocornut/imgui
 
 #include <imgui.h>
@@ -23,11 +26,12 @@ static GLuint       g_FontTexture = 0;
 // This is the main rendering function that you have to implement and provide to ImGui (via setting up 'RenderDrawListsFn' in the ImGuiIO structure)
 // If text or lines are blurry when integrating ImGui in your engine:
 // - in your Render function, try translating your projection matrix by (0.5f,0.5f) or (0.375f,0.375f)
-static void ImGui_ImplGlfw_RenderDrawLists(ImDrawData* draw_data)
+void ImGui_ImplGlfw_RenderDrawLists(ImDrawData* draw_data)
 {
     // We are using the OpenGL fixed pipeline to make the example code simpler to read!
-    // A probable faster way to render would be to collate all vertices from all cmd_lists into a single vertex buffer.
     // Setup render state: alpha-blending enabled, no face culling, no depth testing, scissor enabled, vertex/texcoord/color pointers.
+    GLint last_texture;
+    glGetIntegerv(GL_TEXTURE_BINDING_2D, &last_texture);
     glPushAttrib(GL_ENABLE_BIT | GL_COLOR_BUFFER_BIT | GL_TRANSFORM_BIT);
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
@@ -40,13 +44,16 @@ static void ImGui_ImplGlfw_RenderDrawLists(ImDrawData* draw_data)
     glEnable(GL_TEXTURE_2D);
     //glUseProgram(0); // You may want this if using this code in an OpenGL 3+ context
 
+    // Handle cases of screen coordinates != from framebuffer coordinates (e.g. retina displays)
+    ImGuiIO& io = ImGui::GetIO();
+    float fb_height = io.DisplaySize.y * io.DisplayFramebufferScale.y;
+    draw_data->ScaleClipRects(io.DisplayFramebufferScale);
+
     // Setup orthographic projection matrix
-    const float width = ImGui::GetIO().DisplaySize.x;
-    const float height = ImGui::GetIO().DisplaySize.y;
     glMatrixMode(GL_PROJECTION);
     glPushMatrix();
     glLoadIdentity();
-    glOrtho(0.0f, width, height, 0.0f, -1.0f, +1.0f);
+    glOrtho(0.0f, io.DisplaySize.x, io.DisplaySize.y, 0.0f, -1.0f, +1.0f);
     glMatrixMode(GL_MODELVIEW);
     glPushMatrix();
     glLoadIdentity();
@@ -72,7 +79,7 @@ static void ImGui_ImplGlfw_RenderDrawLists(ImDrawData* draw_data)
             else
             {
                 glBindTexture(GL_TEXTURE_2D, (GLuint)(intptr_t)pcmd->TextureId);
-                glScissor((int)pcmd->ClipRect.x, (int)(height - pcmd->ClipRect.w), (int)(pcmd->ClipRect.z - pcmd->ClipRect.x), (int)(pcmd->ClipRect.w - pcmd->ClipRect.y));
+                glScissor((int)pcmd->ClipRect.x, (int)(fb_height - pcmd->ClipRect.w), (int)(pcmd->ClipRect.z - pcmd->ClipRect.x), (int)(pcmd->ClipRect.w - pcmd->ClipRect.y));
                 glDrawElements(GL_TRIANGLES, (GLsizei)pcmd->ElemCount, GL_UNSIGNED_SHORT, idx_buffer);
             }
             idx_buffer += pcmd->ElemCount;
@@ -84,7 +91,7 @@ static void ImGui_ImplGlfw_RenderDrawLists(ImDrawData* draw_data)
     glDisableClientState(GL_COLOR_ARRAY);
     glDisableClientState(GL_TEXTURE_COORD_ARRAY);
     glDisableClientState(GL_VERTEX_ARRAY);
-    glBindTexture(GL_TEXTURE_2D, 0);
+    glBindTexture(GL_TEXTURE_2D, last_texture);
     glMatrixMode(GL_MODELVIEW);
     glPopMatrix();
     glMatrixMode(GL_PROJECTION);
@@ -138,12 +145,14 @@ bool ImGui_ImplGlfw_CreateDeviceObjects()
 {
     ImGuiIO& io = ImGui::GetIO();
 
-    // Build texture
+    // Build texture atlas
     unsigned char* pixels;
     int width, height;
     io.Fonts->GetTexDataAsAlpha8(&pixels, &width, &height);
 
-    // Create texture
+    // Create OpenGL texture
+    GLint last_texture;
+    glGetIntegerv(GL_TEXTURE_BINDING_2D, &last_texture);
     glGenTextures(1, &g_FontTexture);
     glBindTexture(GL_TEXTURE_2D, g_FontTexture);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
@@ -156,6 +165,7 @@ bool ImGui_ImplGlfw_CreateDeviceObjects()
     // Cleanup (don't clear the input data if you want to append new fonts later)
     io.Fonts->ClearInputData();
     io.Fonts->ClearTexData();
+    glBindTexture(GL_TEXTURE_2D, last_texture);
 
     return true;
 }
@@ -175,7 +185,7 @@ bool    ImGui_ImplGlfw_Init(GLFWwindow* window, bool install_callbacks)
     g_Window = window;
 
     ImGuiIO& io = ImGui::GetIO();
-    io.KeyMap[ImGuiKey_Tab] = GLFW_KEY_TAB;                 // Keyboard mapping. ImGui will use those indices to peek into the io.KeyDown[] array.
+    io.KeyMap[ImGuiKey_Tab] = GLFW_KEY_TAB;                     // Keyboard mapping. ImGui will use those indices to peek into the io.KeyDown[] array.
     io.KeyMap[ImGuiKey_LeftArrow] = GLFW_KEY_LEFT;
     io.KeyMap[ImGuiKey_RightArrow] = GLFW_KEY_RIGHT;
     io.KeyMap[ImGuiKey_UpArrow] = GLFW_KEY_UP;
@@ -195,7 +205,7 @@ bool    ImGui_ImplGlfw_Init(GLFWwindow* window, bool install_callbacks)
     io.KeyMap[ImGuiKey_Y] = GLFW_KEY_Y;
     io.KeyMap[ImGuiKey_Z] = GLFW_KEY_Z;
 
-    io.RenderDrawListsFn = ImGui_ImplGlfw_RenderDrawLists;
+    io.RenderDrawListsFn = ImGui_ImplGlfw_RenderDrawLists;      // Alternatively you can set this to NULL and call ImGui::GetDrawData() after ImGui::Render() to get the same ImDrawData pointer.
     io.SetClipboardTextFn = ImGui_ImplGlfw_SetClipboardText;
     io.GetClipboardTextFn = ImGui_ImplGlfw_GetClipboardText;
 #ifdef _WIN32
@@ -231,7 +241,8 @@ void ImGui_ImplGlfw_NewFrame()
     int display_w, display_h;
     glfwGetWindowSize(g_Window, &w, &h);
     glfwGetFramebufferSize(g_Window, &display_w, &display_h);
-    io.DisplaySize = ImVec2((float)display_w, (float)display_h);
+    io.DisplaySize = ImVec2((float)w, (float)h);
+    io.DisplayFramebufferScale = ImVec2((float)display_w / w, (float)display_h / h);
 
     // Setup time step
     double current_time =  glfwGetTime();
@@ -244,9 +255,7 @@ void ImGui_ImplGlfw_NewFrame()
     {
     	double mouse_x, mouse_y;
     	glfwGetCursorPos(g_Window, &mouse_x, &mouse_y);
-    	mouse_x *= (float)display_w / w;                        // Convert mouse coordinates to pixels
-    	mouse_y *= (float)display_h / h;
-    	io.MousePos = ImVec2((float)mouse_x, (float)mouse_y);   // Mouse position, in pixels (set to -1,-1 if no mouse / on another screen, etc.)
+    	io.MousePos = ImVec2((float)mouse_x, (float)mouse_y);   // Mouse position in screen coordinates (set to -1,-1 if no mouse / on another screen, etc.)
     }
     else
     {

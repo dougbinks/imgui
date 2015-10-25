@@ -1,26 +1,20 @@
-// ImGui - standalone example application for Glfw + OpenGL 2, using fixed pipeline
+// ImGui - standalone example application for Marmalade
+// Copyright (C) 2015 by Giovanni Zito
+// This file is part of ImGui
+// https://github.com/ocornut/imgui
 
 #include <imgui.h>
-#include "imgui_impl_glfw.h"
+#include "imgui_impl_marmalade.h"
 #include <stdio.h>
-#include <GLFW/glfw3.h>
 
-static void error_callback(int error, const char* description)
-{
-    fprintf(stderr, "Error %d: %s\n", error, description);
-}
+#include <s3eKeyboard.h>
+#include <s3ePointer.h>
+#include <IwGx.h>
 
 int main(int, char**)
 {
-    // Setup window
-    glfwSetErrorCallback(error_callback);
-    if (!glfwInit())
-        exit(1);
-    GLFWwindow* window = glfwCreateWindow(1280, 720, "ImGui OpenGL2 example", NULL, NULL);
-    glfwMakeContextCurrent(window);
-
     // Setup ImGui binding
-    ImGui_ImplGlfw_Init(window, true);
+    ImGui_Marmalade_Init(true);
 
     // Load Fonts
     // (see extra_fonts/README.txt for more details)
@@ -33,7 +27,7 @@ int main(int, char**)
     //io.Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\ArialUni.ttf", 18.0f, NULL, io.Fonts->GetGlyphRangesJapanese());
 
     // Merge glyphs from multiple fonts into one (e.g. combine default font with another with Chinese glyphs, or add icons)
-    //static const ImWchar icons_ranges[] = { 0xf000, 0xf3ff, 0 }; // will not be copied by AddFont* so keep in scope.
+    //ImWchar icons_ranges[] = { 0xf000, 0xf3ff, 0 };
     //ImFontConfig icons_config; icons_config.MergeMode = true; icons_config.PixelSnapH = true;
     //io.Fonts->AddFontFromFileTTF("../../extra_fonts/DroidSans.ttf", 18.0f);
     //io.Fonts->AddFontFromFileTTF("../../extra_fonts/fontawesome-webfont.ttf", 18.0f, &icons_config, icons_ranges);
@@ -43,10 +37,14 @@ int main(int, char**)
     ImVec4 clear_color = ImColor(114, 144, 154);
 
     // Main loop
-    while (!glfwWindowShouldClose(window))
+    while (true)
     {
-        glfwPollEvents();
-        ImGui_ImplGlfw_NewFrame();
+         if (s3eDeviceCheckQuitRequest())
+             break;
+
+         s3eKeyboardUpdate();
+         s3ePointerUpdate();
+         ImGui_Marmalade_NewFrame();
 
         // 1. Show a simple window
         // Tip: if we don't call ImGui::Begin()/ImGui::End() the widgets appears in a window automatically called "Debug"
@@ -77,18 +75,16 @@ int main(int, char**)
         }
 
         // Rendering
-        int display_w, display_h;
-        glfwGetFramebufferSize(window, &display_w, &display_h);
-        glViewport(0, 0, display_w, display_h);
-        glClearColor(clear_color.x, clear_color.y, clear_color.z, clear_color.w);
-        glClear(GL_COLOR_BUFFER_BIT);
+        IwGxSetColClear(clear_color.x*255,clear_color.y*255,clear_color.z*255,clear_color.w*255) ;
+        IwGxClear();
         ImGui::Render();
-        glfwSwapBuffers(window);
+        IwGxSwapBuffers();
+
+        s3eDeviceYield(0);
     }
 
     // Cleanup
-    ImGui_ImplGlfw_Shutdown();
-    glfwTerminate();
+    ImGui_Marmalade_Shutdown();
 
     return 0;
 }

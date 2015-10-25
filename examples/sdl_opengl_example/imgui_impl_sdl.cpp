@@ -1,4 +1,7 @@
 // ImGui SDL2 binding with OpenGL
+// You can copy and use unmodified imgui_impl_* files in your project. 
+// If you use this binding you'll need to call 4 functions: ImGui_ImplXXXX_Init(), ImGui_ImplXXXX_NewFrame(), ImGui::Render() and ImGui_ImplXXXX_Shutdown().
+// See main.cpp for an example of using this.
 // https://github.com/ocornut/imgui
 
 #include <SDL.h>
@@ -16,7 +19,7 @@ static GLuint       g_FontTexture = 0;
 // This is the main rendering function that you have to implement and provide to ImGui (via setting up 'RenderDrawListsFn' in the ImGuiIO structure)
 // If text or lines are blurry when integrating ImGui in your engine:
 // - in your Render function, try translating your projection matrix by (0.5f,0.5f) or (0.375f,0.375f)
-static void ImGui_ImplSdl_RenderDrawLists(ImDrawData* draw_data)
+void ImGui_ImplSdl_RenderDrawLists(ImDrawData* draw_data)
 {
     // We are using the OpenGL fixed pipeline to make the example code simpler to read!
     // A probable faster way to render would be to collate all vertices from all cmd_lists into a single vertex buffer.
@@ -174,7 +177,7 @@ void    ImGui_ImplSdl_InvalidateDeviceObjects()
 bool    ImGui_ImplSdl_Init(SDL_Window *window)
 {
     ImGuiIO& io = ImGui::GetIO();
-    io.KeyMap[ImGuiKey_Tab] = SDLK_TAB;                 // Keyboard mapping. ImGui will use those indices to peek into the io.KeyDown[] array.
+    io.KeyMap[ImGuiKey_Tab] = SDLK_TAB;                     // Keyboard mapping. ImGui will use those indices to peek into the io.KeyDown[] array.
     io.KeyMap[ImGuiKey_LeftArrow] = SDL_SCANCODE_LEFT;
     io.KeyMap[ImGuiKey_RightArrow] = SDL_SCANCODE_RIGHT;
     io.KeyMap[ImGuiKey_UpArrow] = SDL_SCANCODE_UP;
@@ -194,7 +197,7 @@ bool    ImGui_ImplSdl_Init(SDL_Window *window)
     io.KeyMap[ImGuiKey_Y] = SDLK_y;
     io.KeyMap[ImGuiKey_Z] = SDLK_z;
 	
-    io.RenderDrawListsFn = ImGui_ImplSdl_RenderDrawLists;
+    io.RenderDrawListsFn = ImGui_ImplSdl_RenderDrawLists;   // Alternatively you can set this to NULL and call ImGui::GetDrawData() after ImGui::Render() to get the same ImDrawData pointer.
     io.SetClipboardTextFn = ImGui_ImplSdl_SetClipboardText;
     io.GetClipboardTextFn = ImGui_ImplSdl_GetClipboardText;
 	
