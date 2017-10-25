@@ -429,7 +429,8 @@ void ImGui::ShowTestWindow(bool* p_open)
                     else
                     {
                         // Leaf: The only reason we have a TreeNode at all is to allow selection of the leaf. Otherwise we can use BulletText() or TreeAdvanceToLabelPos()+Text().
-                        ImGui::TreeNodeEx((void*)(intptr_t)i, node_flags | ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen, "Selectable Leaf %d", i);
+                        node_flags |= ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen; // ImGuiTreeNodeFlags_Bullet
+                        ImGui::TreeNodeEx((void*)(intptr_t)i, node_flags, "Selectable Leaf %d", i);
                         if (ImGui::IsItemClicked()) 
                             node_clicked = i;
                     }
@@ -453,14 +454,16 @@ void ImGui::ShowTestWindow(bool* p_open)
         if (ImGui::TreeNode("Collapsing Headers"))
         {
             static bool closable_group = true;
+            ImGui::Checkbox("Enable extra group", &closable_group);
             if (ImGui::CollapsingHeader("Header"))
             {
-                ImGui::Checkbox("Enable extra group", &closable_group);
+                ImGui::Text("IsItemHovered: %d", IsItemHovered());
                 for (int i = 0; i < 5; i++)
                     ImGui::Text("Some content %d", i);
             }
             if (ImGui::CollapsingHeader("Header with a close button", &closable_group))
             {
+                ImGui::Text("IsItemHovered: %d", IsItemHovered());
                 for (int i = 0; i < 5; i++)
                     ImGui::Text("More content %d", i);
             }
@@ -1053,7 +1056,7 @@ void ImGui::ShowTestWindow(bool* p_open)
             ImGui::TextColored(ImVec4(1,1,0,1), "Sailor");
 
             // Button
-            ImGui::AlignFirstTextHeightToWidgets();
+            ImGui::AlignTextToFramePadding();
             ImGui::Text("Normal buttons"); ImGui::SameLine();
             ImGui::Button("Banana"); ImGui::SameLine();
             ImGui::Button("Apple"); ImGui::SameLine();
@@ -1179,7 +1182,7 @@ void ImGui::ShowTestWindow(bool* p_open)
             ImGui::Text("TEST"); ImGui::SameLine();
             ImGui::SmallButton("TEST##2");
 
-            ImGui::AlignFirstTextHeightToWidgets(); // If your line starts with text, call this to align it to upcoming widgets.
+            ImGui::AlignTextToFramePadding(); // If your line starts with text, call this to align it to upcoming widgets.
             ImGui::Text("Text aligned to Widget"); ImGui::SameLine();
             ImGui::Button("Widget##1"); ImGui::SameLine();
             ImGui::Text("Widget"); ImGui::SameLine();
@@ -1192,7 +1195,7 @@ void ImGui::ShowTestWindow(bool* p_open)
             ImGui::SameLine(0.0f, spacing);
             if (ImGui::TreeNode("Node##1")) { for (int i = 0; i < 6; i++) ImGui::BulletText("Item %d..", i); ImGui::TreePop(); }    // Dummy tree data
 
-            ImGui::AlignFirstTextHeightToWidgets();         // Vertically align text node a bit lower so it'll be vertically centered with upcoming widget. Otherwise you can use SmallButton (smaller fit).
+            ImGui::AlignTextToFramePadding();         // Vertically align text node a bit lower so it'll be vertically centered with upcoming widget. Otherwise you can use SmallButton (smaller fit).
             bool node_open = ImGui::TreeNode("Node##2");  // Common mistake to avoid: if we want to SameLine after TreeNode we need to do it before we add child content.
             ImGui::SameLine(0.0f, spacing); ImGui::Button("Button##2");
             if (node_open) { for (int i = 0; i < 6; i++) ImGui::BulletText("Item %d..", i); ImGui::TreePop(); }   // Dummy tree data
@@ -1202,7 +1205,7 @@ void ImGui::ShowTestWindow(bool* p_open)
             ImGui::SameLine(0.0f, spacing);
             ImGui::BulletText("Bullet text");
 
-            ImGui::AlignFirstTextHeightToWidgets();
+            ImGui::AlignTextToFramePadding();
             ImGui::BulletText("Node");
             ImGui::SameLine(0.0f, spacing); ImGui::Button("Button##4");
 
@@ -1380,41 +1383,32 @@ void ImGui::ShowTestWindow(bool* p_open)
                 ImGui::EndPopup();
             }
 
-            ImGui::Spacing();
-            ImGui::TextWrapped("Below we are testing adding menu items to a regular window. It's rather unusual but should work!");
-            ImGui::Separator();
-            // NB: As a quirk in this very specific example, we want to differentiate the parent of this menu from the parent of the various popup menus above.
-            // To do so we are encloding the items in a PushID()/PopID() block to make them two different menusets. If we don't, opening any popup above and hovering our menu here
-            // would open it. This is because once a menu is active, we allow to switch to a sibling menu by just hovering on it, which is the desired behavior for regular menus.
-            ImGui::PushID("foo");
-            ImGui::MenuItem("Menu item", "CTRL+M");
-            if (ImGui::BeginMenu("Menu inside a regular window"))
-            {
-                ShowExampleMenuFile();
-                ImGui::EndMenu();
-            }
-            ImGui::PopID();
-            ImGui::Separator();
-
             ImGui::TreePop();
         }
 
         if (ImGui::TreeNode("Context menus"))
         {
+            // BeginPopupContextItem() is a helper to provide common/simple popup behavior of essentially doing:
+            //    if (IsItemHovered() && IsMouseClicked(0))
+            //       OpenPopup(id);
+            //    return BeginPopup(id);
+            // For more advanced uses you may want to replicate and cuztomize this code. This the comments inside BeginPopupContextItem() implementation.
             static float value = 0.5f;
             ImGui::Text("Value = %.3f (<-- right-click here)", value);
             if (ImGui::BeginPopupContextItem("item context menu"))
             {
                 if (ImGui::Selectable("Set to zero")) value = 0.0f;
                 if (ImGui::Selectable("Set to PI")) value = 3.1415f;
-                ImGui::DragFloat("Value", &value, 0.1f, 0.0f, 0.0f);
+                ImGui::PushItemWidth(-1);
+                ImGui::DragFloat("##Value", &value, 0.1f, 0.0f, 0.0f);
+                ImGui::PopItemWidth();
                 ImGui::EndPopup();
             }
 
             static char name[32] = "Label1";
-            char buf[64]; sprintf(buf, "Button: %s###Button", name); // ### operator override ID ignoring the preceeding label
+            char buf[64]; sprintf(buf, "Button: %s###Button", name); // ### operator override ID ignoring the preceding label
             ImGui::Button(buf);
-            if (ImGui::BeginPopupContextItem("rename context menu"))
+            if (ImGui::BeginPopupContextItem()) // When used after an item that has an ID (here the Button), we can skip providing an ID to BeginPopupContextItem().
             {
                 ImGui::Text("Edit name:");
                 ImGui::InputText("##edit", name, IM_ARRAYSIZE(name));
@@ -1459,6 +1453,8 @@ void ImGui::ShowTestWindow(bool* p_open)
                 ImGui::Text("Hello from Stacked The First\nUsing style.Colors[ImGuiCol_ModalWindowDarkening] for darkening.");
                 static int item = 1;
                 ImGui::Combo("Combo", &item, "aaaa\0bbbb\0cccc\0dddd\0eeee\0\0");
+                static float color[4] = { 0.4f,0.7f,0.0f,0.5f };
+                ImGui::ColorEdit4("color", color);  // This is to test behavior of stacked regular popups over a modal
 
                 if (ImGui::Button("Add another modal.."))
                     ImGui::OpenPopup("Stacked 2");
@@ -1475,6 +1471,25 @@ void ImGui::ShowTestWindow(bool* p_open)
                 ImGui::EndPopup();
             }
 
+            ImGui::TreePop();
+        }
+
+        if (ImGui::TreeNode("Menus inside a regular window"))
+        {
+            ImGui::TextWrapped("Below we are testing adding menu items to a regular window. It's rather unusual but should work!");
+            ImGui::Separator();
+            // NB: As a quirk in this very specific example, we want to differentiate the parent of this menu from the parent of the various popup menus above.
+            // To do so we are encloding the items in a PushID()/PopID() block to make them two different menusets. If we don't, opening any popup above and hovering our menu here
+            // would open it. This is because once a menu is active, we allow to switch to a sibling menu by just hovering on it, which is the desired behavior for regular menus.
+            ImGui::PushID("foo");
+            ImGui::MenuItem("Menu item", "CTRL+M");
+            if (ImGui::BeginMenu("Menu inside a regular window"))
+            {
+                ShowExampleMenuFile();
+                ImGui::EndMenu();
+            }
+            ImGui::PopID();
+            ImGui::Separator();
             ImGui::TreePop();
         }
     }
@@ -1750,6 +1765,34 @@ void ImGui::ShowTestWindow(bool* p_open)
             ImGui::TreePop();
         }
 
+        if (ImGui::TreeNode("Hovering"))
+        {
+            // Testing IsWindowHovered() function
+            ImGui::BulletText(
+                "IsWindowHovered() = %d\n"
+                "IsWindowHovered(_AllowWhenBlockedByPopup) = %d\n"
+                "IsWindowHovered(_AllowWhenBlockedByActiveItem) = %d\n",
+                ImGui::IsWindowHovered(),
+                ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByPopup),
+                ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem));
+
+            // Testing IsItemHovered() function (because BulletText is an item itself and that would affect the output of IsItemHovered, we pass all lines in a single items to shorten the code)
+            ImGui::Button("ITEM");
+            ImGui::BulletText(
+                "IsItemHovered() = %d\n"
+                "IsItemHovered(_AllowWhenBlockedByPopup) = %d\n"
+                "IsItemHovered(_AllowWhenBlockedByActiveItem) = %d\n"
+                "IsItemHovered(_AllowWhenOverlapped) = %d\n"
+                "IsItemhovered(_RectOnly) = %d\n",
+                ImGui::IsItemHovered(),
+                ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenBlockedByPopup),
+                ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem),
+                ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenOverlapped),
+                ImGui::IsItemHovered(ImGuiHoveredFlags_RectOnly));
+
+            ImGui::TreePop();
+        }
+
         if (ImGui::TreeNode("Dragging"))
         {
             ImGui::TextWrapped("You can use ImGui::GetMouseDragDelta(0) to query for the dragged amount on any widget.");
@@ -1908,6 +1951,7 @@ void ImGui::ShowStyleEditor(ImGuiStyle* ref)
         for (int i = 0; i < atlas->Fonts.Size; i++)
         {
             ImFont* font = atlas->Fonts[i];
+            ImGui::PushID(font);
             bool font_details_opened = ImGui::TreeNode(font, "Font %d: \'%s\', %.2f px, %d glyphs", i, font->ConfigData ? font->ConfigData[0].Name : "", font->FontSize, font->Glyphs.Size);
             ImGui::SameLine(); if (ImGui::SmallButton("Set as default")) ImGui::GetIO().FontDefault = font;
             if (font_details_opened)
@@ -1968,6 +2012,7 @@ void ImGui::ShowStyleEditor(ImGuiStyle* ref)
                 }
                 ImGui::TreePop();
             }
+            ImGui::PopID();
         }
         static float window_scale = 1.0f;
         ImGui::DragFloat("this window scale", &window_scale, 0.005f, 0.3f, 2.0f, "%.1f");              // scale only this window
@@ -2124,7 +2169,7 @@ static void ShowExampleAppFixedOverlay(bool* p_open)
     ImVec2 window_pos = ImVec2((corner & 1) ? ImGui::GetIO().DisplaySize.x - DISTANCE : DISTANCE, (corner & 2) ? ImGui::GetIO().DisplaySize.y - DISTANCE : DISTANCE);
     ImVec2 window_pos_pivot = ImVec2((corner & 1) ? 1.0f : 0.0f, (corner & 2) ? 1.0f : 0.0f);
     ImGui::SetNextWindowPos(window_pos, ImGuiCond_Always, window_pos_pivot);
-    ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.0f, 0.0f, 0.0f, 0.3f));
+    ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.0f, 0.0f, 0.0f, 0.3f)); // Transparent background
     if (ImGui::Begin("Example: Fixed Overlay", p_open, ImGuiWindowFlags_NoTitleBar|ImGuiWindowFlags_NoResize|ImGuiWindowFlags_AlwaysAutoResize|ImGuiWindowFlags_NoMove|ImGuiWindowFlags_NoSavedSettings))
     {
         ImGui::Text("Simple overlay\nin the corner of the screen.\n(right-click to change position)");
@@ -2314,6 +2359,7 @@ struct ExampleAppConsole
 
     void    AddLog(const char* fmt, ...) IM_FMTARGS(2)
     {
+        // FIXME-OPT
         char buf[1024];
         va_list args;
         va_start(args, fmt);
@@ -2711,10 +2757,10 @@ static void ShowExampleAppPropertyEditor(bool* p_open)
         static void ShowDummyObject(const char* prefix, int uid)
         {
             ImGui::PushID(uid);                      // Use object uid as identifier. Most commonly you could also use the object pointer as a base ID.
-            ImGui::AlignFirstTextHeightToWidgets();  // Text and Tree nodes are less high than regular widgets, here we add vertical spacing to make the tree lines equal high.
+            ImGui::AlignTextToFramePadding();  // Text and Tree nodes are less high than regular widgets, here we add vertical spacing to make the tree lines equal high.
             bool node_open = ImGui::TreeNode("Object", "%s_%u", prefix, uid);
             ImGui::NextColumn();
-            ImGui::AlignFirstTextHeightToWidgets();
+            ImGui::AlignTextToFramePadding();
             ImGui::Text("my sailor is rich");
             ImGui::NextColumn();
             if (node_open)
@@ -2729,7 +2775,7 @@ static void ShowExampleAppPropertyEditor(bool* p_open)
                     }
                     else
                     {
-                        ImGui::AlignFirstTextHeightToWidgets();
+                        ImGui::AlignTextToFramePadding();
                         // Here we use a Selectable (instead of Text) to highlight on hover
                         //ImGui::Text("Field_%d", i);
                         char label[32];
