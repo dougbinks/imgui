@@ -6099,7 +6099,7 @@ bool ImGui::Begin(const char* name, bool* p_open, ImGuiWindowFlags flags)
         window->DC.MenuBarAppending = false;
         window->DC.MenuBarOffset = ImVec2( ImMax(window->WindowPadding.x, style.ItemSpacing.x), 0.0f );
 		if (flags & ImGuiWindowFlags_MainMenuBar)
-			window->DC.MenuBarOffset += g.Style.DisplaySafeAreaPadding;
+			window->DC.MenuBarOffset = ImVec2( ImMax(window->DC.MenuBarOffset.x, g.Style.DisplaySafeAreaPadding.x), ImMax(window->DC.MenuBarOffset.y, g.Style.DisplaySafeAreaPadding.y));
         window->DC.LogLinePosY = window->DC.CursorPos.y - 9999.0f;
         window->DC.ChildWindows.resize(0);
         window->DC.LayoutType = ImGuiLayoutType_Vertical;
