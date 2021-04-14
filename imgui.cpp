@@ -6966,6 +6966,8 @@ void ImGui::BringWindowToDisplayFront(ImGuiWindow* window)
             g.Windows[g.Windows.Size - 1] = window;
             break;
         }
+    if (g.PlatformIO.Platform_SetWindowFocus)
+        g.PlatformIO.Platform_SetWindowFocus(window->Viewport);
 }
 
 void ImGui::BringWindowToDisplayBack(ImGuiWindow* window)
