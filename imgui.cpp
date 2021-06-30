@@ -6957,15 +6957,17 @@ void ImGui::BringWindowToDisplayFront(ImGuiWindow* window)
 {
     ImGuiContext& g = *GImGui;
     ImGuiWindow* current_front_window = g.Windows.back();
-    if (current_front_window == window || current_front_window->RootWindowDockTree == window) // Cheap early out (could be better)
-        return;
-    for (int i = g.Windows.Size - 2; i >= 0; i--) // We can ignore the top-most window
-        if (g.Windows[i] == window)
-        {
-            memmove(&g.Windows[i], &g.Windows[i + 1], (size_t)(g.Windows.Size - i - 1) * sizeof(ImGuiWindow*));
-            g.Windows[g.Windows.Size - 1] = window;
-            break;
-        }
+    if (current_front_window != window && current_front_window->RootWindowDockTree != window)
+    {
+        for (int i = g.Windows.Size - 2; i >= 0; i--) // We can ignore the top-most window
+            if (g.Windows[i] == window)
+            {
+                memmove(&g.Windows[i], &g.Windows[i + 1], (size_t)(g.Windows.Size - i - 1) * sizeof(ImGuiWindow*));
+                g.Windows[g.Windows.Size - 1] = window;
+                break;
+            }
+    }
+    // Even if window is front it may not be brought to front at OS level, so always do this
     if (g.PlatformIO.Platform_SetWindowFocus && window->Viewport && window->Viewport->PlatformWindowCreated )
         g.PlatformIO.Platform_SetWindowFocus(window->Viewport);
 }
