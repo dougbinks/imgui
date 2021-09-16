@@ -6327,7 +6327,7 @@ bool ImGui::Begin(const char* name, bool* p_open, ImGuiWindowFlags flags)
     if (g.NextWindowData.Flags & ImGuiNextWindowDataFlags_HasCollapsed)
         SetWindowCollapsed(window, g.NextWindowData.CollapsedVal, g.NextWindowData.CollapsedCond);
     if (g.NextWindowData.Flags & ImGuiNextWindowDataFlags_HasFocus)
-        FocusWindow(window);
+        FocusWindow(window,true);
     if (window->Appearing)
         SetWindowConditionAllowFlags(window, ImGuiCond_Appearing, false);
 
@@ -7032,7 +7032,7 @@ void ImGui::BringWindowToFocusFront(ImGuiWindow* window)
     window->FocusOrder = (short)new_order;
 }
 
-void ImGui::BringWindowToDisplayFront(ImGuiWindow* window)
+void ImGui::BringWindowToDisplayFront(ImGuiWindow* window, bool platform_front)
 {
     ImGuiContext& g = *GImGui;
     ImGuiWindow* current_front_window = g.Windows.back();
@@ -7047,7 +7047,7 @@ void ImGui::BringWindowToDisplayFront(ImGuiWindow* window)
             }
     }
     // Even if window is front it may not be brought to front at OS level, so always do this
-    if (g.PlatformIO.Platform_SetWindowFocus && window->Viewport && window->Viewport->PlatformWindowCreated )
+    if (platform_front && g.PlatformIO.Platform_SetWindowFocus && window->Viewport && window->Viewport->PlatformWindowCreated )
         g.PlatformIO.Platform_SetWindowFocus(window->Viewport);
 }
 
@@ -7066,7 +7066,7 @@ void ImGui::BringWindowToDisplayBack(ImGuiWindow* window)
 }
 
 // Moving window to front of display and set focus (which happens to be back of our sorted list)
-void ImGui::FocusWindow(ImGuiWindow* window)
+void ImGui::FocusWindow(ImGuiWindow* window, bool platform_front)
 {
     ImGuiContext& g = *GImGui;
 
@@ -7114,7 +7114,7 @@ void ImGui::FocusWindow(ImGuiWindow* window)
     // Bring to front
     BringWindowToFocusFront(focus_front_window);
     if (((window->Flags | focus_front_window->Flags | display_front_window->Flags) & ImGuiWindowFlags_NoBringToFrontOnFocus) == 0)
-        BringWindowToDisplayFront(display_front_window);
+        BringWindowToDisplayFront(display_front_window,platform_front);
 }
 
 void ImGui::FocusTopMostWindowUnderOne(ImGuiWindow* under_this_window, ImGuiWindow* ignore_window)
@@ -7525,11 +7525,11 @@ void ImGui::SetWindowFocus(const char* name)
     if (name)
     {
         if (ImGuiWindow* window = FindWindowByName(name))
-            FocusWindow(window);
+            FocusWindow(window,true);
     }
     else
     {
-        FocusWindow(NULL);
+        FocusWindow(NULL,true);
     }
 }
 
