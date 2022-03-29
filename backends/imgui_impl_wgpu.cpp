@@ -13,6 +13,7 @@
 
 // CHANGELOG
 // (minor and older changes stripped away, please see git history for details)
+//  2021-11-29: Passing explicit buffer sizes to wgpuRenderPassEncoderSetVertexBuffer()/wgpuRenderPassEncoderSetIndexBuffer().
 //  2021-08-24: Fix for latest specs.
 //  2021-05-24: Add support for draw_data->FramebufferScale.
 //  2021-05-19: Replaced direct access to ImDrawCmd::TextureId with a call to ImDrawCmd::GetTexID(). (will become a requirement)
@@ -270,7 +271,7 @@ static WGPUProgrammableStageDescriptor ImGui_ImplWGPU_CreateShaderModule(uint32_
     spirv_desc.codeSize = binary_data_size;
     spirv_desc.code = binary_data;
 
-    WGPUShaderModuleDescriptor desc;
+    WGPUShaderModuleDescriptor desc = {};
     desc.nextInChain = reinterpret_cast<WGPUChainedStruct*>(&spirv_desc);
 
     WGPUProgrammableStageDescriptor stage_desc = {};
@@ -281,7 +282,7 @@ static WGPUProgrammableStageDescriptor ImGui_ImplWGPU_CreateShaderModule(uint32_
 
 static WGPUBindGroup ImGui_ImplWGPU_CreateImageBindGroup(WGPUBindGroupLayout layout, WGPUTextureView texture)
 {
-    WGPUBindGroupEntry image_bg_entries[] = { { 0, 0, 0, 0, 0, texture } };
+    WGPUBindGroupEntry image_bg_entries[] = { { nullptr, 0, 0, 0, 0, 0, texture } };
 
     WGPUBindGroupDescriptor image_bg_descriptor = {};
     image_bg_descriptor.layout = layout;
@@ -313,8 +314,8 @@ static void ImGui_ImplWGPU_SetupRenderState(ImDrawData* draw_data, WGPURenderPas
     wgpuRenderPassEncoderSetViewport(ctx, 0, 0, draw_data->FramebufferScale.x * draw_data->DisplaySize.x, draw_data->FramebufferScale.y * draw_data->DisplaySize.y, 0, 1);
 
     // Bind shader and vertex buffers
-    wgpuRenderPassEncoderSetVertexBuffer(ctx, 0, fr->VertexBuffer, 0, 0);
-    wgpuRenderPassEncoderSetIndexBuffer(ctx, fr->IndexBuffer, sizeof(ImDrawIdx) == 2 ? WGPUIndexFormat_Uint16 : WGPUIndexFormat_Uint32, 0, 0);
+    wgpuRenderPassEncoderSetVertexBuffer(ctx, 0, fr->VertexBuffer, 0, fr->VertexBufferSize * sizeof(ImDrawVert));
+    wgpuRenderPassEncoderSetIndexBuffer(ctx, fr->IndexBuffer, sizeof(ImDrawIdx) == 2 ? WGPUIndexFormat_Uint16 : WGPUIndexFormat_Uint32, 0, fr->IndexBufferSize * sizeof(ImDrawIdx));
     wgpuRenderPassEncoderSetPipeline(ctx, g_pipelineState);
     wgpuRenderPassEncoderSetBindGroup(ctx, 0, g_resources.CommonBindGroup, 0, NULL);
 
@@ -446,7 +447,7 @@ void ImGui_ImplWGPU_RenderDrawData(ImDrawData* draw_data, WGPURenderPassEncoder 
                 // Project scissor/clipping rectangles into framebuffer space
                 ImVec2 clip_min((pcmd->ClipRect.x - clip_off.x) * clip_scale.x, (pcmd->ClipRect.y - clip_off.y) * clip_scale.y);
                 ImVec2 clip_max((pcmd->ClipRect.z - clip_off.x) * clip_scale.x, (pcmd->ClipRect.w - clip_off.y) * clip_scale.y);
-                if (clip_max.x < clip_min.x || clip_max.y < clip_min.y)
+                if (clip_max.x <= clip_min.x || clip_max.y <= clip_min.y)
                     continue;
 
                 // Apply scissor/clipping rectangle, Draw
@@ -478,7 +479,7 @@ static void ImGui_ImplWGPU_CreateFontsTexture()
         tex_desc.sampleCount = 1;
         tex_desc.format = WGPUTextureFormat_RGBA8Unorm;
         tex_desc.mipLevelCount = 1;
-        tex_desc.usage = WGPUTextureUsage_CopyDst | WGPUTextureUsage_Sampled;
+        tex_desc.usage = WGPUTextureUsage_CopyDst | WGPUTextureUsage_TextureBinding;
         g_resources.FontTexture = wgpuDeviceCreateTexture(g_wgpuDevice, &tex_desc);
 
         WGPUTextureViewDescriptor tex_view_desc = {};
@@ -571,7 +572,7 @@ bool ImGui_ImplWGPU_CreateDeviceObjects()
 
     WGPUVertexBufferLayout buffer_layouts[1];
     buffer_layouts[0].arrayStride = sizeof(ImDrawVert);
-    buffer_layouts[0].stepMode = WGPUInputStepMode_Vertex;
+    buffer_layouts[0].stepMode = WGPUVertexStepMode_Vertex;
     buffer_layouts[0].attributeCount = 3;
     buffer_layouts[0].attributes = attribute_desc;
 
@@ -624,8 +625,8 @@ bool ImGui_ImplWGPU_CreateDeviceObjects()
 
     WGPUBindGroupEntry common_bg_entries[] =
     {
-        { 0, g_resources.Uniforms, 0, sizeof(Uniforms), 0, 0 },
-        { 1, 0, 0, 0, g_resources.Sampler, 0 },
+        { nullptr, 0, g_resources.Uniforms, 0, sizeof(Uniforms), 0, 0 },
+        { nullptr, 1, 0, 0, 0, g_resources.Sampler, 0 },
     };
 
     WGPUBindGroupDescriptor common_bg_descriptor = {};
